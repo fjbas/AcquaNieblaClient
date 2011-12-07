@@ -8,6 +8,7 @@ db    =    None
 counter  =0
 device = None
 read_data = None
+token = None
 import time
 import urllib
 from urllib2 import Request,urlopen
@@ -19,7 +20,7 @@ def log(message):
     
 def connect_to_database():
     global db
-    if db is not None:
+    if db is not None: #Esto hace que se comporte como singleton!
         return db
     
     import sqlite3
@@ -37,8 +38,43 @@ def connect_to_database():
             sent integer DEFAULT 0
         )
         """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS
+        CONFIGURATION
+        (
+            key text primary key,
+            value text
+        )
+    """)
     return db
 
+def set_token():
+    
+    db = connect_to_database()
+    cursor = db.cursor()
+    cursor.execute("Select value from CONFIGURATION where key = ?",["token"])
+    
+    result = cursor.fetchone()
+    global token
+    if result is not None:
+        
+        token = result[0]
+        print "Token is " + token
+        return 
+    else:
+        try:
+            print "No token exists"
+            #No tengo token asi que se lo pido a la web
+            url = "http://1.androidtravellog.appspot.com/getvalue"
+            request = Request(url,urllib.urlencode({'tag':'token'}))
+            f = urlopen(request)
+            response = f.read()
+            token = response.split(',')[-1].replace('"','').replace(']','').strip()
+            db.execute("INSERT INTO CONFIGURATION VALUES (?,?)",("token",token))
+        except:
+            log("Could not get token")
+            token = "NO-TOKEN"
+            
 def connect_to_device():
     import serial
     global device
@@ -90,8 +126,8 @@ def send_data_to_server():
         output_data = {}
         for key in row.keys():
             output_data[key] = row[key]
-
-        data_to_server = {'tag' : "anm_" + str(row['id']), 'value':output_data}      
+        output_data['token'] = token
+        data_to_server = {'tag' : "anm_"+str(token)+ "_" + str(row['id']), 'value':output_data}      
         try:
             request = Request(url,urllib.urlencode(data_to_server))
             f = urlopen(request)
@@ -111,7 +147,7 @@ def rules_allow_continuation():
 
 def main():
     connect_to_database()
-    
+    set_token()
     while rules_allow_continuation():
         read_data_from_device()
         save_data_to_database()

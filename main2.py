@@ -11,6 +11,7 @@ read_data = (1,1)
 sampling_time=1
 moment=None
 
+
 import time
 from urllib2 import Request
 
@@ -91,14 +92,25 @@ def rules_allow_continuation():
     global counter    
     counter = counter  +1
     
-    return counter < 100
+    return counter < 5
+    
+
+
+def get_average_values_sensors():
+    for index in read_data:
+        average_a[index]=average_a[index]+int(read_data[index])
+        log(average_a)
+    
+    pass
+
+
 
 def write_to_dropbox():
     f = open ("base.txt", "a")
     f.write(str(time.strftime("%Y;%m;%d;%H;%M;%S;",moment)))
   
     for index in read_data:
-        f.write(str(int(read_data[index]))+";")#problema imprime salto de linea en a y b
+        f.write(str(int(read_data[index]))+";")
         
     f.write("\n")
     f.close()

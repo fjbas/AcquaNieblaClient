@@ -4,25 +4,33 @@ Created on Wed Nov 30 12:12:30 2011
 
 @author: francisco
 """
+
 db    =    None
 counter  =0
 device = None
 read_data = None
 token = None
-import time
-import urllib
-from urllib2 import Request,urlopen
+sensor_startup = [[],[],[],[],[],[],[],[],[],[],[]] 
+seconds_between_data_samples = 1
+seconds_between_average_calculation = 60
+seconds_between_watch_dog=30
+keep_going = True
+ad_sensors=sensor_startup
 
+
+
+import time
+import sys
+
+from threading import Timer
 
 def log(message):
     moment = time.gmtime()    
-    print time.strftime("[%Y-%m-%d %H:%M:%S ]",moment) + " " + message
+    print time.strftime("[%Y-%m-%d %H:%M:%S ]",moment) + " " + str(message)
     
 def connect_to_database():
     global db
-    if db is not None: #Esto hace que se comporte como singleton!
-        return db
-    
+    keep_going
     import sqlite3
     db = sqlite3.connect('./measures.db')
     db.row_factory = sqlite3.Row
@@ -48,45 +56,21 @@ def connect_to_database():
     """)
     return db
 
-def set_token():
-    
-    db = connect_to_database()
-    cursor = db.cursor()
-    cursor.execute("Select value from CONFIGURATION where key = ?",["token"])
-    
-    result = cursor.fetchone()
-    global token
-    if result is not None:
-        
-        token = result[0]
-        print "Token is " + token
-        return 
-    else:
-        try:
-            print "No token exists"
-            #No tengo token asi que se lo pido a la web
-            url = "http://1.androidtravellog.appspot.com/getvalue"
-            request = Request(url,urllib.urlencode({'tag':'token'}))
-            f = urlopen(request)
-            response = f.read()
-            token = response.split(',')[-1].replace('"','').replace(']','').strip()
-            db.execute("INSERT INTO CONFIGURATION VALUES (?,?)",("token",token))
-        except:
-            log("Could not get token")
-            token = "NO-TOKEN"
-            
 def connect_to_device():
     import serial
     global device
-    
+    global keep_going
     if device is not None:
         return device
     log("Connecting to device...")    
-    device = serial.Serial("/dev/ttyUSB0",9600,timeout=1,writeTimeout=1)#tty se refiere que es terminal
+    try:
+        device = serial.Serial("/dev/ttyUSB0",9600,timeout=1,writeTimeout=1)#tty se refiere que es terminal
+    except:
+        log("Connection error")
+        keep_going = False
+        sys.exit(500)
     log("Connected")  
-    device.write("r")
-    a=device.readline()#si no las pongo parte lellendo apartir del segundo momento
-    b=device.readline()
+    
     return device
 
 def disconnect_device():
@@ -95,64 +79,92 @@ def disconnect_device():
         device.close()
     device = None
     
+def disconnect_database():
+    db.close()
+
+def get_average_sensors():
+    global ad_sensors
+    sensors_average = []
+    for index in ad_sensors:
+        if(len(index) == 0): continue
+        avg = sum(index) / len(index)
+
+        sensors_average.append(avg)
+
+    log(sensors_average)
+
+    save_data_to_database(sensors_average)
+    
+    ad_sensors=[[],[],[],[],[],[],[],[],[],[],[]]
+    
 
 def read_data_from_device():
-    device = connect_to_device() 
-    device.write("r")
-    
-    a=device.readline()#read value of device
-    b=device.readline()
-    
-    log ("a:" + str(a) + " b:" + str(b))
     global read_data
-    read_data ={1:a,2:b}
+    global ad_sensors, ad_count
+    read_data = []    
+    device = connect_to_device() 
+    line = ""       
+    try:
+        device.write("r")
+    except:
+        sys.exit("500")
+    line = device.readline().strip()
+    
+    while (line != "EOF" and len(line) > 0):
+        value = float(line)
+        read_data.append(line) 
+        index = len(read_data) - 1
+        ad_sensors[index].append(value)
+        line = device.readline().strip()
     
 
-def save_data_to_database():
+    log(ad_sensors)
+    
+    
+
+def save_data_to_database(data):
     db = connect_to_database()
-    for index in read_data:#index posicion del arreglo
-        log("INSERT INTO MEASURE (id_sensor,value) VALUES " + str(index) + " , " + str(read_data[index]))
-        db.execute("INSERT INTO MEASURE (id_sensor,value) VALUES (?,?)",(index, read_data[index]))
+    for index in range(len(data)):#index posicion del arreglo
+        log("INSERT INTO MEASURE (id_sensor,value) VALUES " + str(index) + " , " + str(data[index]))
+        db.execute("INSERT INTO MEASURE (id_sensor,value) VALUES (?,?)",(index, data[index]))
         #Grabar en un archivo de texto
+    disconnect_database()
 
-def send_data_to_server():
+
+def data_capture():
+    if keep_going:
+        Timer(seconds_between_data_samples,data_capture).start()
+    log("data capture")    
+    read_data_from_device()
+
+def get_average_and_save():
+    if keep_going:
+        Timer(seconds_between_average_calculation,get_average_and_save).start()    
+    log("average calculation")
+    get_average_sensors()
     
-    url = "http://1.androidtravellog.appspot.com/storeavalue"    
-    query = "select * from measure where sent = 0"
-    db = connect_to_database()
-    cursor = db.cursor()
-    cursor.execute(query)
-    for row in cursor:
-        output_data = {}
-        for key in row.keys():
-            output_data[key] = row[key]
-        output_data['token'] = token
-        data_to_server = {'tag' : "anm_"+str(token)+ "_" + str(row['id']), 'value':output_data}      
-        try:
-            request = Request(url,urllib.urlencode(data_to_server))
-            f = urlopen(request)
-            print f.read()
-            db.execute("UPDATE MEASURE SET sent = 1 where id = ?",[row['id']])
-            #log ("UPDATE MEASURE SET sent = 1 where id = " + str(row['id']))
-        except Exception as exc:
-            log(str(exc))
-
-
 
 def rules_allow_continuation():
     global counter    
     counter = counter  +1
-    return counter < 3
+    return counter < 5 and keep_going
     
-
+def watch_dog():
+    if keep_going:
+        Timer(seconds_between_watch_dog,watch_dog).start() 
+    log("Watchdog is writing the file...")
+    f = open ("/tmp/aquaniebla.watchdog", "w")
+    f.close()
+    
+    
 def main():
+    watch_dog()
+    time.sleep(60)
     connect_to_database()
-    set_token()
-    while rules_allow_continuation():
-        read_data_from_device()
-        save_data_to_database()
-        
-    send_data_to_server()             
+    Timer(seconds_between_data_samples,data_capture).start()
+    Timer(seconds_between_average_calculation,get_average_and_save).start()
+    
+                 
         
         
 

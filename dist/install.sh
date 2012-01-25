@@ -19,6 +19,8 @@ cp -rv scripts/watchdog.* $INSTALL_DIR/watchdog
 cp -v scripts/*.sh $INSTALL_DIR/scripts/
 cp -v scripts/acquaniebla.cron /etc/cron.d/acquaniebla
 
-ln -sf /acquaniebla/scripts/acquaniebla.sh /etc/init.d/acquaniebla.sh
-ln -sf /etc/init.d/acquaniebla.sh /etc/rc5.d/S20acquaniebla
+ln -sf /acquaniebla/scripts/acquaniebla.sh /etc/init.d/acquaniebla
+ln -sf /etc/init.d/acquaniebla /etc/rcS.d/S20acquaniebla
 
+update-rc.d acquaniebla defaults
+ 

@@ -10,7 +10,11 @@ import os
 import datetime
 import sys
 
-five_minutes = 10
+if os.path.isfile("/acquaniebla/watchdog/.lock"):
+     print "Lock file exists"
+     sys.exit(0)
+
+five_minutes = 5
 
 file_timestamp = os.path.getmtime("/acquaniebla/log/acquaniebla.watchdog")
 file_date = datetime.datetime.fromtimestamp(file_timestamp)

@@ -6,5 +6,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 *  *  * * *   root	/acquaniebla/scripts/uploader.sh
 3,5,10,15,20,25,30,35,40,45,50,55,0 * * * *	root	/acquaniebla/watchdog/watchdog.sh 
+* * * * 3 * root /acquaniebla/scripts/clearlog.sh
 
 

@@ -159,7 +159,7 @@ def watch_dog():
     
 def main():
     watch_dog()
-    time.sleep(60)
+    time.sleep(1)
     connect_to_database()
     Timer(seconds_between_data_samples,data_capture).start()
     Timer(seconds_between_average_calculation,get_average_and_save).start()

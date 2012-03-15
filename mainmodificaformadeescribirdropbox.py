@@ -74,6 +74,7 @@ def read_data_from_device():
            
     a=device.readline()#read value of device
     b=device.readline()
+    log(a)
     
     #log ("a:" + str(int(a)) + " b:" + str(int(b)))
     global read_data
@@ -168,15 +169,15 @@ def write_to_dropbox():
 #                            print "cc"
 
 def main():
-    connect_to_database()
+    #connect_to_database()
     
     while rules_allow_continuation():
 
         read_data_from_device()
         
-        save_data_to_database()
-        send_data_to_server()
-        write_to_dropbox()
+     #   save_data_to_database()
+      #  send_data_to_server()
+       # write_to_dropbox()
         print(ad_sensors)
         print(ad_count)
       

@@ -48,7 +48,7 @@ def connect_to_database():
     global db
     keep_going0
     import sqlite3
-    db = sqlite3.connect('/home/francisco/Escritorio/prueba_con_2_entradas_usb/measures.db')
+    db = sqlite3.connect('./measures.db')
     db.row_factory = sqlite3.Row
     db.isolation_level = None    
     db.execute("""
